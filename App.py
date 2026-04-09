@@ -79,8 +79,10 @@ with st.sidebar:
     st.divider()
     st.header("📧 Email Automation")
     enable_email = st.checkbox("Enable Auto-Response")
-    s_email = st.text_input("hirebot.project@gmail.com")
-    s_pass = st.text_input("App Password", type="nfyq ghye qzlw bmcb")
+    
+    # FIXED: Corrected label vs value placement
+    s_email = st.text_input("Sender Email", value="hirebot.project@gmail.com")
+    s_pass = st.text_input("App Password", type="password", value="nfyq ghye qzlw bmcb")
 
 uploaded_files = st.file_uploader("Upload Resumes (PDF)", type="pdf", accept_multiple_files=True)
 
@@ -110,7 +112,10 @@ if uploaded_files and st.button("Start Analysis"):
     df = pd.DataFrame(results)
     st.divider()
     st.subheader("Analysis Summary")
-    st.dataframe(df.style.map(lambda x: 'background-color: #d4edda' if x == 'SELECTED' else 'background-color: #f8d7da', subset=['Status']), use_container_width=True)
+    
+    # FIXED: Added 'subset' check and fallback for styling
+    if not df.empty:
+        st.dataframe(df.style.applymap(lambda x: 'background-color: #d4edda' if x == 'SELECTED' else 'background-color: #f8d7da', subset=['Status']), use_container_width=True)
     
     save_to_db(results)
     st.success("Analysis Complete! Data saved to local history.")
