@@ -42,16 +42,26 @@ def extract_text_from_pdf(file):
         return text.lower()
     except: return ""
 
-def calculate_score_nlp(resume_text, required_skills):
+def calculate_hybrid_score(resume_text, required_skills):
     if not resume_text: return 0.0, required_skills
+    
+    # --- PART A: NLP Scoring (50% weight) ---
     jd = " ".join(required_skills)
     vectorizer = TfidfVectorizer(ngram_range=(1, 2), stop_words='english')
     try:
         tfidf = vectorizer.fit_transform([resume_text, jd])
-        score = round(cosine_similarity(tfidf[0:1], tfidf[1:2])[0][0] * 100, 2)
-    except: score = 0.0
+        nlp_score = cosine_similarity(tfidf[0:1], tfidf[1:2])[0][0] * 100
+    except: nlp_score = 0.0
+
+    # --- PART B: Exact Match Scoring (50% weight) ---
+    found_keywords = [s for s in required_skills if s.lower() in resume_text]
+    keyword_score = (len(found_keywords) / len(required_skills)) * 100 if required_skills else 0
+    
+    # --- PART C: Combined Final Score ---
+    final_score = round((nlp_score * 0.5) + (keyword_score * 0.5), 2)
+    
     missing = [s for s in required_skills if s.lower() not in resume_text]
-    return score, missing
+    return final_score, missing
 
 def send_email(to_email, subject, body, s_email, s_pass):
     try:
@@ -69,7 +79,7 @@ def send_email(to_email, subject, body, s_email, s_pass):
     except: return False
 
 # --- 4. UI ---
-st.title("🚀 Smart Resume Screening & Automation")
+st.title("🚀 AI Resume Screener (Hybrid Engine)")
 
 with st.sidebar:
     st.header("⚙️ Settings")
@@ -84,38 +94,40 @@ with st.sidebar:
 
 uploaded_files = st.file_uploader("Upload Resumes (PDF)", type="pdf", accept_multiple_files=True)
 
-if uploaded_files and st.button("Start Analysis"):
+if uploaded_files and st.button("Start Hybrid Analysis"):
     results = []
     skills_list = [s.strip().lower() for s in req_skills_input.split(",")]
     
     for file in uploaded_files:
         text = extract_text_from_pdf(file)
-        # Optimized regex for better email capture
         email_match = re.search(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', text)
         email = email_match.group(0) if email_match else None
         
-        score, missing = calculate_score_nlp(text, skills_list)
+        score, missing = calculate_hybrid_score(text, skills_list)
         status = "SELECTED" if score >= cutoff else "REJECTED"
         
-        # --- IMPROVED EMAIL STATUS LOGIC ---
+        # --- FILTER: EMAIL ONLY SELECTED ---
         if not enable_email:
             e_status = "Disabled"
+        elif status == "REJECTED":
+            e_status = "Skipped (Rejected)"
         elif not email:
             e_status = "Email Not Found ⚠️"
-        elif s_email and s_pass:
+        elif status == "SELECTED" and s_email and s_pass:
             body = f"""
             <html>
                 <body>
-                    <h3>Application Update</h3>
+                    <h3>Interview Invitation</h3>
                     <p>Hello,</p>
-                    <p>Your resume has been analyzed by our Recuitment Team.</p>
-                    <p><b>Match Score:</b> {score}%<br>
+                    <p>Congratulations! Your resume has been shortlisted by our Hybrid AI system.</p>
+                    <p><b>Hybrid Match Score:</b> {score}%<br>
                     <b>Status:</b> {status}</p>
+                    <p>Our team will reach out shortly for the interview schedule.</p>
                     <p>Best regards,<br>HR Recruitment Team</p>
                 </body>
             </html>
             """
-            e_status = "Sent ✅" if send_email(email, "Job Application Update", body, s_email, s_pass) else "Failed ❌"
+            e_status = "Sent ✅" if send_email(email, "Shortlisted: Application Update", body, s_email, s_pass) else "Failed ❌"
         else:
             e_status = "Config Missing"
 
@@ -139,13 +151,11 @@ if uploaded_files and st.button("Start Analysis"):
             return f'background-color: {color}'
 
         try:
-            # Modern Pandas
             styled_df = df.style.map(color_status, subset=['Status'])
         except AttributeError:
-            # Older Pandas
             styled_df = df.style.applymap(color_status, subset=['Status'])
             
         st.dataframe(styled_df, use_container_width=True)
     
     save_to_db(results)
-    st.success("Analysis Complete! Data saved to local history.")
+    st.success("Hybrid Analysis Complete! Data saved to local history.")
