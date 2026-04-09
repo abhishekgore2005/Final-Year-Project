@@ -84,7 +84,7 @@ st.title("🚀 AI Resume Intelligence & Recruitment Suite")
 with st.sidebar:
     st.header("⚙️ Configuration")
     req_skills_input = st.text_area("Target Skills", "python, sql, machine learning")
-    cutoff = st.slider("Success Threshold (%)", 0, 100, 40)
+    cutoff = st.slider("Selection Percentage (%)", 0, 100, 40)
     
     st.divider()
     st.header("📧 Automation Settings")
