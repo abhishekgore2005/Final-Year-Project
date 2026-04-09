@@ -15,7 +15,8 @@ st.set_page_config(page_title="AI Resume Intelligence Pro", layout="wide")
 
 # --- 2. DATABASE SETUP ---
 def init_db():
-    conn = sqlite3.connect('resume_history.db')
+    # Changed filename to ensure a clean table structure with the new columns
+    conn = sqlite3.connect('resume_intelligence.db')
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS candidates
                  (date TEXT, filename TEXT, email TEXT, phone TEXT, score REAL, status TEXT)''')
@@ -23,12 +24,13 @@ def init_db():
     conn.close()
 
 def save_to_db(data_list):
-    conn = sqlite3.connect('resume_history.db')
+    conn = sqlite3.connect('resume_intelligence.db')
     c = conn.cursor()
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     for row in data_list:
+        # We use the exact keys defined in the results dictionary below
         c.execute("INSERT INTO candidates VALUES (?,?,?,?,?,?)", 
-                  (timestamp, row['Filename'], row['Email'], row['Phone'], row['Score'], row['Status']))
+                  (timestamp, row['Filename'], row['Contact Email'], row['Phone'], row['Score (%)'], row['Status']))
     conn.commit()
     conn.close()
 
@@ -45,7 +47,7 @@ def extract_text_from_pdf(file):
 def calculate_hybrid_score(resume_text, required_skills):
     if not resume_text: return 0.0, required_skills, []
     
-    # NLP Part
+    # NLP Component
     jd = " ".join(required_skills)
     vectorizer = TfidfVectorizer(ngram_range=(1, 2), stop_words='english')
     try:
@@ -53,7 +55,7 @@ def calculate_hybrid_score(resume_text, required_skills):
         nlp_score = cosine_similarity(tfidf[0:1], tfidf[1:2])[0][0] * 100
     except: nlp_score = 0.0
 
-    # Keyword Part
+    # Keyword Component
     found_keywords = [s for s in required_skills if s.lower() in resume_text]
     keyword_score = (len(found_keywords) / len(required_skills)) * 100 if required_skills else 0
     
@@ -78,7 +80,6 @@ def send_email(to_email, subject, body, s_email, s_pass):
 
 # --- 4. UI ---
 st.title("🚀 AI Resume Intelligence & Recruitment Suite")
-st.markdown("Automated Screening, Scoring, and Candidate Engagement")
 
 with st.sidebar:
     st.header("⚙️ Configuration")
@@ -100,7 +101,7 @@ if uploaded_files and st.button("Run Intelligence Engine"):
     for file in uploaded_files:
         text = extract_text_from_pdf(file)
         
-        # Data Extraction (Email & Phone)
+        # Robust Regex for Email and Phone
         email_match = re.search(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', text)
         phone_match = re.search(r'(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}', text)
         
@@ -110,19 +111,23 @@ if uploaded_files and st.button("Run Intelligence Engine"):
         score, missing, found = calculate_hybrid_score(text, skills_list)
         status = "SELECTED" if score >= cutoff else "REJECTED"
         
-        # Fit Level Label
+        # Fit Label Logic
         if score >= 75: fit = "🔥 High"
         elif score >= 40: fit = "✅ Moderate"
         else: fit = "❌ Low"
 
-        # Email Logic
-        if not enable_email: e_status = "Disabled"
-        elif status == "REJECTED": e_status = "Skipped"
-        elif email == "N/A": e_status = "No Email Found"
+        # Email Notification Logic
+        if not enable_email:
+            e_status = "Disabled"
+        elif status == "REJECTED":
+            e_status = "Skipped"
+        elif email == "N/A":
+            e_status = "No Email Found"
         else:
-            body = f"<h3>Congratulations!</h3><p>Your resume scored {score}%. We'll contact you soon.</p>"
-            e_status = "Sent ✅" if send_email(email, "Interview Invitation", body, s_email, s_pass) else "Failed ❌"
+            body = f"<h3>Congratulations!</h3><p>Your resume scored {score}%. We will contact you soon for an interview.</p>"
+            e_status = "Sent ✅" if send_email(email, "Shortlisted!", body, s_email, s_pass) else "Failed ❌"
 
+        # Dictionary keys must match what save_to_db calls!
         results.append({
             "Filename": file.name,
             "Contact Email": email,
@@ -138,7 +143,7 @@ if uploaded_files and st.button("Run Intelligence Engine"):
     df = pd.DataFrame(results)
     st.divider()
     
-    # Styled Dataframe
+    # Custom Styling
     def color_status(val):
         if val == 'SELECTED': return 'background-color: #d4edda; color: #155724'
         if val == 'REJECTED': return 'background-color: #f8d7da; color: #721c24'
@@ -152,14 +157,15 @@ if uploaded_files and st.button("Run Intelligence Engine"):
     st.subheader("📋 Candidate Intelligence Report")
     st.dataframe(styled_df, use_container_width=True)
     
-    # DOWNLOAD BUTTON
+    # Export functionality
     csv = df.to_csv(index=False).encode('utf-8')
     st.download_button(
         label="📥 Export Analysis to CSV",
         data=csv,
-        file_name=f"screening_report_{datetime.now().strftime('%Y%m%d')}.csv",
+        file_name=f"recruitment_report_{datetime.now().strftime('%Y%m%d')}.csv",
         mime="text/csv",
     )
     
+    # Final database save
     save_to_db(results)
-    st.success(f"Successfully processed {len(uploaded_files)} resumes.")
+    st.success(f"Analysis Complete! Processed {len(uploaded_files)} candidate(s).")
