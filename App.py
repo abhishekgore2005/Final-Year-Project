@@ -90,20 +90,42 @@ if uploaded_files and st.button("Start Analysis"):
     
     for file in uploaded_files:
         text = extract_text_from_pdf(file)
-        email_match = re.search(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b', text)
+        # Optimized regex for better email capture
+        email_match = re.search(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', text)
         email = email_match.group(0) if email_match else None
         
         score, missing = calculate_score_nlp(text, skills_list)
         status = "SELECTED" if score >= cutoff else "REJECTED"
         
-        e_status = "Disabled"
-        if enable_email and email and s_email and s_pass:
-            body = f"Hello, your resume scored {score}%. Your status is: {status}."
-            e_status = "Sent ✅" if send_email(email, "Application Update", body, s_email, s_pass) else "Failed ❌"
+        # --- IMPROVED EMAIL STATUS LOGIC ---
+        if not enable_email:
+            e_status = "Disabled"
+        elif not email:
+            e_status = "Email Not Found ⚠️"
+        elif s_email and s_pass:
+            body = f"""
+            <html>
+                <body>
+                    <h3>Application Update</h3>
+                    <p>Hello,</p>
+                    <p>Your resume has been analyzed by our AI system.</p>
+                    <p><b>Match Score:</b> {score}%<br>
+                    <b>Status:</b> {status}</p>
+                    <p>Best regards,<br>HR Recruitment Team</p>
+                </body>
+            </html>
+            """
+            e_status = "Sent ✅" if send_email(email, "Job Application Update", body, s_email, s_pass) else "Failed ❌"
+        else:
+            e_status = "Config Missing"
 
         results.append({
-            "Filename": file.name, "Email": email, "Score": score, 
-            "Status": status, "Email Status": e_status, "Missing Skills": ", ".join(missing)
+            "Filename": file.name, 
+            "Email": email if email else "N/A", 
+            "Score": score, 
+            "Status": status, 
+            "Email Status": e_status, 
+            "Missing Skills": ", ".join(missing)
         })
 
     # Show Results
@@ -117,8 +139,10 @@ if uploaded_files and st.button("Start Analysis"):
             return f'background-color: {color}'
 
         try:
+            # Modern Pandas
             styled_df = df.style.map(color_status, subset=['Status'])
         except AttributeError:
+            # Older Pandas
             styled_df = df.style.applymap(color_status, subset=['Status'])
             
         st.dataframe(styled_df, use_container_width=True)
