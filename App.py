@@ -79,8 +79,6 @@ with st.sidebar:
     st.divider()
     st.header("📧 Email Automation")
     enable_email = st.checkbox("Enable Auto-Response")
-    
-    # FIXED: Corrected label vs value placement
     s_email = st.text_input("Sender Email", value="hirebot.project@gmail.com")
     s_pass = st.text_input("App Password", type="password", value="nfyq ghye qzlw bmcb")
 
@@ -113,9 +111,17 @@ if uploaded_files and st.button("Start Analysis"):
     st.divider()
     st.subheader("Analysis Summary")
     
-    # FIXED: Added 'subset' check and fallback for styling
     if not df.empty:
-        st.dataframe(df.style.applymap(lambda x: 'background-color: #d4edda' if x == 'SELECTED' else 'background-color: #f8d7da', subset=['Status']), use_container_width=True)
+        def color_status(val):
+            color = '#d4edda' if val == 'SELECTED' else '#f8d7da'
+            return f'background-color: {color}'
+
+        try:
+            styled_df = df.style.map(color_status, subset=['Status'])
+        except AttributeError:
+            styled_df = df.style.applymap(color_status, subset=['Status'])
+            
+        st.dataframe(styled_df, use_container_width=True)
     
     save_to_db(results)
     st.success("Analysis Complete! Data saved to local history.")
