@@ -108,7 +108,7 @@ if uploaded_files and st.button("Start Analysis"):
                 <body>
                     <h3>Application Update</h3>
                     <p>Hello,</p>
-                    <p>Your resume has been analyzed by our AI system.</p>
+                    <p>Your resume has been analyzed by our Recuitment Team.</p>
                     <p><b>Match Score:</b> {score}%<br>
                     <b>Status:</b> {status}</p>
                     <p>Best regards,<br>HR Recruitment Team</p>
